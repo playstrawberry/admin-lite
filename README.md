@@ -86,8 +86,14 @@ from this source does not load on them.
 ## Build from source
 
 You need Rust with the `wasm32-wasip2` target and the Strawberry plugin SDK
-(`strawberry-plugin-api`), which Play Strawberry gives to its plugin developers. Put the SDK in a
-folder named `strawberry-plugin-api` next to this one, or change its path in `Cargo.toml`.
+(`strawberry-plugin-api`), which Play Strawberry gives to its plugin developers.
+`Cargo.toml` takes it from the SDK registry named `strawberry`; add that registry to
+your Cargo configuration (for example `~/.cargo/config.toml`):
+
+```toml
+[registries.strawberry]
+index = "sparse+https://sdk.playstrawberry.net/index/"
+```
 
 ```text
 cargo test
