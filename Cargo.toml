@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 description = "Strawberry first-party plugin: staff tools (inventory view, vanish, freeze, teleport, watch, heal, feed, fly, game mode shortcuts, warnings, mutes, temporary bans, unban, punishment history, staff menu)."
 authors = ["Strawberry Interactive LLC"]
-license = "LicenseRef-All-Rights-Reserved"
+license = "LicenseRef-Strawberry-Source-Available-1.0"
 publish = false
 
 [lib]
