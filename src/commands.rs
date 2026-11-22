@@ -16,7 +16,11 @@
 //! | `/mute <player> <duration> [reason]`, `/unmute <player>` | `admin-lite:mute` |
 //! | `/tempban <player> <duration> [reason]` | `admin-lite:tempban` |
 //! | `/unban <player>` | `admin-lite:unban` |
+//! | `/tempipban <player> <duration> [reason]` | `admin-lite:tempipban` |
 //! | `/history <player> [page]` | `admin-lite:history` |
+//!
+//! A permanent IP ban and its lifting are the server's own `/ban-ip <player>` and
+//! `/pardon-ip <player>`, written into the history too.
 
 use std::sync::Arc;
 
@@ -59,6 +63,7 @@ pub enum Cmd {
     Unmute,
     TempBan,
     Unban,
+    TempIpBan,
     History,
 }
 
@@ -151,7 +156,7 @@ fn run(
     args: &ConsumedArgs,
 ) -> Result<Outcome, CommandError> {
     let named_online = || need(args, "player").and_then(|name| actions::online(server, &name));
-    let named_known = || need(args, "player").and_then(|name| actions::known(admin, server, &name));
+    let named_known = || need(args, "player").and_then(|name| actions::known(server, &name));
     let reason = || arg(args, "reason").unwrap_or_default();
     Ok(match cmd {
         Cmd::Staff => {
@@ -192,6 +197,9 @@ fn run(
         Cmd::Unban => {
             need(args, "player").and_then(|name| actions::unban(admin, server, actor, &name))
         }
+        Cmd::TempIpBan => named_known().and_then(|t| {
+            seconds(args).and_then(|s| actions::tempipban(admin, server, actor, &t, s, &reason()))
+        }),
         Cmd::History => need(args, "player")
             .and_then(|name| actions::history(admin, server, actor, &name, page(args))),
     })
@@ -349,11 +357,11 @@ pub fn register(context: &Context, admin: &Arc<Admin>) {
         context.register_command(command, node);
     }
 
-    // A reason is free text and may hold an address a staff member typed: the commands that take
-    // one are sensitive, so the console's "issued server command" line shows the command word
-    // only (no IP on the console). The audit log keeps the detail, cleaned.
+    // A reason is free text and may hold an address a staff member typed. The server hides every
+    // address in every console and log line, the "issued server command" line included, and the
+    // plugin's own lines show it as `[IP]`. These commands are not marked sensitive: that is for
+    // login secrets, and it would hide the player's name and the reason in the staff notices.
     let warn = Command::new(&names("warn"), "Warn a player.")
-        .sensitive()
         .then(player().then(CommandNode::argument("reason", &greedy()).execute(run(Cmd::Warn))));
     context.register_command(warn, perms::WARN);
 
@@ -365,8 +373,14 @@ pub fn register(context: &Context, admin: &Arc<Admin>) {
             Cmd::TempBan,
             perms::TEMPBAN,
         ),
+        (
+            "tempipban",
+            "Ban a player's address for a time.",
+            Cmd::TempIpBan,
+            perms::TEMPIPBAN,
+        ),
     ] {
-        let command = Command::new(&names(name), about).sensitive().then(
+        let command = Command::new(&names(name), about).then(
             player().then(
                 CommandNode::argument("duration", &word())
                     .execute(run(cmd))

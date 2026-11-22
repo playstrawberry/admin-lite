@@ -2,16 +2,21 @@
 //!
 //! - inventory and ender chest views, a staff menu and a menu per player;
 //! - vanish, freeze, teleport to and bring, watch (spectator through the player's eyes);
-//! - heal, feed, fly and game mode shortcuts;
-//! - warnings, temporary mutes, temporary bans on the server's own ban list, unban, and a
-//!   persistent punishment history that also records vanilla `/kick`, `/ban` and `/pardon`.
+//! - heal, feed, fly (from the old `essentials-lite`) and game mode shortcuts;
+//! - warnings, temporary mutes, temporary bans on the engine's own ban list, unban, temporary IP
+//!   bans by player (`ipban`), and a persistent punishment history that also records vanilla
+//!   `/kick`, `/ban`, `/pardon`, `/ban-ip <player>` and `/pardon-ip <player>`.
 //!
 //! Every action has its own permission node (`perms`) and writes an audit line to the data
-//! folder (`audit`). The plugin never asks the server for a player's IP address, and an address
-//! typed into a reason is shown as `[IP]`.
+//! folder (`audit`). The plugin never asks the server for a player's IP address (an IP ban names
+//! the player; the server keeps the address), and an address typed into a reason is shown as
+//! `[IP]`.
 //!
 //! Who acted is taken from the command sender, which another plugin can forge today (it can run
 //! a command as a player or as the console), so permissions are the guard.
+//!
+//! Written fresh from the feature list; `heal`, `feed` and `fly` follow `essentials-lite` from
+//! this repository's history. No other plugin's code was read.
 
 pub mod actions;
 pub mod admin;
@@ -22,11 +27,11 @@ pub mod commands;
 pub mod duration;
 pub mod handlers;
 pub mod history;
+pub mod ipban;
 pub mod lang;
 pub mod menu;
 pub mod menus;
 pub mod perms;
-pub mod seen;
 pub mod staffstate;
 pub mod text;
 pub mod vanish;

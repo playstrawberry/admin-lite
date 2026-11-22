@@ -94,3 +94,15 @@ announce_mute={0} was muted for {1}. Reason: {2}
 announce_kick={0} was kicked. Reason: {1}
 announce_ban={0} was banned. Reason: {1}
 announce_tempban={0} was banned for {1}. Reason: {2}
+
+kind_ipban=IP ban
+kind_tempipban=Temporary IP ban
+kind_unipban=IP unban
+ipban_done=Banned the address of {0} for {1} (ban {2}): {3}
+ipban_own={0} is on your own address: nothing was banned.
+ipban_shared=The address of {0} is shared (a relay without the PROXY protocol, or a private network): an IP ban would lock out everyone behind it, so nothing was banned.
+ipban_unknown=The server has no record of the last login of {0}: nothing was banned.
+ipban_protected=Someone on the address of {0} cannot be punished: nothing was banned.
+ipban_failed=The server did not ban the address of {0}: nothing was banned.
+announce_ipban={0} was IP banned. Reason: {1}
+announce_tempipban={0} was IP banned for {1}. Reason: {2}

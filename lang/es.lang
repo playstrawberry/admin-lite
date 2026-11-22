@@ -94,3 +94,15 @@ announce_mute={0} ha sido silenciado durante {1}. Motivo: {2}
 announce_kick={0} ha sido expulsado. Motivo: {1}
 announce_ban={0} ha sido baneado. Motivo: {1}
 announce_tempban={0} ha sido baneado durante {1}. Motivo: {2}
+
+kind_ipban=Baneo de IP
+kind_tempipban=Baneo de IP temporal
+kind_unipban=Desbaneo de IP
+ipban_done=La dirección de {0} ha sido baneada durante {1} (baneo {2}): {3}
+ipban_own={0} está en tu propia dirección: no se baneó nada.
+ipban_shared=La dirección de {0} es compartida (un relé sin protocolo PROXY o una red privada): un baneo de IP bloquearía a todos los que están detrás, así que no se baneó nada.
+ipban_unknown=El servidor no tiene registro del último inicio de sesión de {0}: no se baneó nada.
+ipban_protected=Alguien en la dirección de {0} no puede ser sancionado: no se baneó nada.
+ipban_failed=El servidor no baneó la dirección de {0}: no se baneó nada.
+announce_ipban={0} ha sido baneado por IP. Motivo: {1}
+announce_tempipban={0} ha sido baneado por IP durante {1}. Motivo: {2}

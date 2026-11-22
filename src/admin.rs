@@ -7,7 +7,6 @@
 //! Files (the plugin's data folder, `plugins/data/admin-lite/` on the server):
 //! - `history.tsv`: the punishment history (`history`), appended to; rewritten only when a
 //!   record changes (a warning delivered at join) or the oldest records go;
-//! - `seen.tsv`: the players seen, for offline targets (`seen`);
 //! - `state.tsv`: vanished, frozen and watching staff, exempt players (`staffstate`);
 //! - `audit.log`: one line per staff action (`audit`), appended; `audit.log.1` is the one before.
 //!
@@ -40,13 +39,11 @@ use crate::{
     lang::{self, Msg},
     menus::View,
     perms,
-    seen::Seen,
     staffstate::StaffState,
     text,
 };
 
 pub const HISTORY_FILE: &str = "data/history.tsv";
-pub const SEEN_FILE: &str = "data/seen.tsv";
 pub const STATE_FILE: &str = "data/state.tsv";
 pub const AUDIT_FILE: &str = "data/audit.log";
 const AUDIT_OLD: &str = "data/audit.log.1";
@@ -205,11 +202,10 @@ pub fn failure(actor: &Actor, line: &Line) -> CommandError {
 #[derive(Default)]
 pub struct Admin {
     pub history: Mutex<History>,
-    pub seen: Mutex<Seen>,
     pub staff: Mutex<StaffState>,
     /// The menu each staff member has open, by UUID.
     pub menus: Mutex<HashMap<String, View>>,
-    /// The UUIDs on the server's ban list as the plugin last saw it (read at load).
+    /// The UUIDs on the engine's ban list as the plugin last saw it (read at load).
     pub known_bans: Mutex<std::collections::HashSet<String>>,
     /// Kicks the plugin caused or saw a vanilla command for, by lowercase name, with their time
     /// and, for a vanilla command, what to write when the kick happens.
@@ -218,7 +214,6 @@ pub struct Admin {
     history_new: Mutex<Vec<String>>,
     history_rewrite: AtomicBool,
     audit_new: Mutex<Vec<String>>,
-    seen_dirty: AtomicBool,
     staff_dirty: AtomicBool,
     flush_planned: AtomicBool,
 }
@@ -291,13 +286,6 @@ impl Admin {
             }
             *lock(&self.history) = history;
         }
-        if let Some(text) = read_optional(SEEN_FILE)? {
-            let (seen, bad) = Seen::from_text(&text);
-            if bad > 0 {
-                keep_broken(SEEN_FILE, bad);
-            }
-            *lock(&self.seen) = seen;
-        }
         if let Some(text) = read_optional(STATE_FILE)? {
             let (state, bad) = StaffState::from_text(&text);
             if bad > 0 {
@@ -328,10 +316,6 @@ impl Admin {
             );
             // Written in full next time, so no record is lost.
             self.history_rewrite.store(true, Ordering::Release);
-        }
-        if self.seen_dirty.swap(false, Ordering::AcqRel) {
-            let text = lock(&self.seen).to_text();
-            write_atomic(SEEN_FILE, &text);
         }
         if self.staff_dirty.swap(false, Ordering::AcqRel) {
             let text = lock(&self.staff).to_text();
@@ -367,11 +351,6 @@ impl Admin {
 
     pub fn staff_changed(self: &Arc<Self>, server: &Server) {
         self.staff_dirty.store(true, Ordering::Release);
-        self.plan_flush(server);
-    }
-
-    pub fn seen_changed(self: &Arc<Self>, server: &Server) {
-        self.seen_dirty.store(true, Ordering::Release);
         self.plan_flush(server);
     }
 
@@ -505,7 +484,10 @@ pub fn announce(server: &Server, record: &Record, skip: &[&str]) {
         return;
     };
     let color = match record.kind {
-        crate::history::Kind::Ban | crate::history::Kind::TempBan => NamedColor::Red,
+        crate::history::Kind::Ban
+        | crate::history::Kind::TempBan
+        | crate::history::Kind::IpBan
+        | crate::history::Kind::TempIpBan => NamedColor::Red,
         _ => NamedColor::Yellow,
     };
     for viewer in server.get_all_players() {

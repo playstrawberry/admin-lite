@@ -5,13 +5,14 @@
 //! click on the server.
 //!
 //! - chat (`PlayerChatEvent`, lowest): a muted player's line is cancelled;
-//! - commands (`PlayerCommandSendEvent`, lowest): the server's gate before a player's command
-//!   runs. A frozen player's commands (but private messages) and a muted player's
-//!   talking commands are cancelled; a vanilla `/kick`, `/ban` or `/pardon` is noted for the
-//!   history. A login plugin's password commands reach that plugin alone, so this handler never
-//!   sees a password;
-//! - console commands (`ServerCommandEvent`, observed only): a vanilla `/kick`, `/ban` or
-//!   `/pardon` from the console is noted for the history;
+//! - commands (`PlayerCommandSendEvent`, lowest): the engine's gate before a player's command runs
+//!   (Paper's `PlayerCommandPreprocessEvent`; the engine's `PlayerCommandPreprocessEvent` is declared
+//!   but never fired). A frozen player's commands (but private messages) and a muted player's
+//!   talking commands are cancelled; a vanilla `/kick`, `/ban`, `/pardon`, `/ban-ip <player>` or
+//!   `/pardon-ip <player>` is noted for the history. A login plugin's password commands reach
+//!   that plugin alone, so this handler never sees a password;
+//! - console commands (`ServerCommandEvent`, observed only): the same vanilla commands from the
+//!   console are noted for the history;
 //! - kicks (`PlayerKickEvent`, observed only): a player kicked by a vanilla `/ban` the plugin
 //!   did not see is found on the ban list and written into the history;
 //! - server list ping: vanished staff online are left out of the player count;
@@ -146,15 +147,12 @@ fn vanished_online(admin: &Admin, server: &Server, except: &str) -> Vec<Player> 
         .collect()
 }
 
-/// What a player brings along when he joins or is online when the plugin loads: the seen
-/// index, the exempt flag, vanish and freeze. Returns whether he is vanished.
+/// What a player brings along when he joins or is online when the plugin loads: the exempt
+/// flag, vanish and freeze. Returns whether he is vanished.
 fn carry_over(admin: &Arc<Admin>, server: &Server, player: &Player) -> bool {
-    let (id, name) = (id_of(player), player.get_name());
+    let id = id_of(player);
     // A player who can join is not banned (a ban lifted by a command the plugin did not see).
     lock(&admin.known_bans).remove(&id);
-    if lock(&admin.seen).see(&id, &name, duration::now()) {
-        admin.seen_changed(server);
-    }
     let exempt = player.has_permission(perms::EXEMPT);
     let exempt_changed = {
         let mut staff = lock(&admin.staff);

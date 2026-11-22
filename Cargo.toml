@@ -2,7 +2,7 @@
 name = "admin-lite"
 version = "0.1.0"
 edition = "2024"
-description = "Strawberry first-party plugin: staff tools (inventory view, vanish, freeze, teleport, watch, heal, feed, fly, game mode shortcuts, warnings, mutes, temporary bans, unban, punishment history, staff menu)."
+description = "Strawberry first-party plugin: staff tools (inventory view, vanish, freeze, teleport, watch, heal, feed, fly, game mode shortcuts, warnings, mutes, temporary bans, unban, temporary IP bans by player, punishment history, staff menu)."
 authors = ["Strawberry Interactive LLC"]
 license = "LicenseRef-Strawberry-Source-Available-1.0"
 publish = false
@@ -11,7 +11,7 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-strawberry-plugin-api = { version = "=0.2.1", registry = "strawberry" }
+strawberry-plugin-api = { version = "=0.2.2", registry = "strawberry" }
 
 # A repository of its own, not a member of a larger workspace.
 [workspace]

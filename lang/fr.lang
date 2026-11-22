@@ -94,3 +94,15 @@ announce_mute={0} est réduit au silence pour {1}. Raison : {2}
 announce_kick={0} a été expulsé. Raison : {1}
 announce_ban={0} a été banni. Raison : {1}
 announce_tempban={0} est banni pour {1}. Raison : {2}
+
+kind_ipban=Bannissement d'IP
+kind_tempipban=Bannissement d'IP temporaire
+kind_unipban=Débannissement d'IP
+ipban_done=L'adresse de {0} est bannie pour {1} (bannissement {2}) : {3}
+ipban_own={0} est sur votre propre adresse : rien n'a été banni.
+ipban_shared=L'adresse de {0} est partagée (un relais sans protocole PROXY, ou un réseau privé) : un bannissement d'IP bloquerait tous ceux qui sont derrière, rien n'a donc été banni.
+ipban_unknown=Le serveur n'a aucune trace de la dernière connexion de {0} : rien n'a été banni.
+ipban_protected=Quelqu'un sur l'adresse de {0} ne peut pas être sanctionné : rien n'a été banni.
+ipban_failed=Le serveur n'a pas banni l'adresse de {0} : rien n'a été banni.
+announce_ipban={0} a été banni par IP. Raison : {1}
+announce_tempipban={0} a été banni par IP pour {1}. Raison : {2}

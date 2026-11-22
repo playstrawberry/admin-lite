@@ -94,3 +94,15 @@ announce_mute={0}, {1} boyunca susturuldu. Sebep: {2}
 announce_kick={0} sunucudan atıldı. Sebep: {1}
 announce_ban={0} banlandı. Sebep: {1}
 announce_tempban={0}, {1} boyunca banlandı. Sebep: {2}
+
+kind_ipban=IP ban
+kind_tempipban=Süreli IP ban
+kind_unipban=IP ban kaldırma
+ipban_done={0} adlı oyuncunun adresi {1} boyunca banlandı (ban {2}): {3}
+ipban_own={0} sizinle aynı adreste: hiçbir şey banlanmadı.
+ipban_shared={0} adlı oyuncunun adresi paylaşılıyor (PROXY protokolü olmayan bir aktarıcı ya da özel bir ağ): IP ban arkasındaki herkesi engellerdi, bu yüzden hiçbir şey banlanmadı.
+ipban_unknown=Sunucuda {0} adlı oyuncunun son girişine ait bir kayıt yok: hiçbir şey banlanmadı.
+ipban_protected={0} adlı oyuncunun adresindeki biri cezalandırılamaz: hiçbir şey banlanmadı.
+ipban_failed=Sunucu {0} adlı oyuncunun adresini banlamadı: hiçbir şey banlanmadı.
+announce_ipban={0} IP banlandı. Sebep: {1}
+announce_tempipban={0}, {1} boyunca IP banlandı. Sebep: {2}

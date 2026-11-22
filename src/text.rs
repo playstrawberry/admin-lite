@@ -2,8 +2,8 @@
 //! the fields of the data files, UUIDs.
 //!
 //! A reason is shown in chat, in the history, in the menus and in the audit log, so anything in
-//! it that looks like an IP address is replaced by `[IP]`: staff sometimes paste one, and no IP
-//! appears in chat, a log or a menu.
+//! it that looks like an IP address is replaced by `[IP]`: staff sometimes paste one, and the
+//! owner's rule is that no IP appears in chat, a log or a menu.
 
 /// The longest reason kept, in characters.
 pub const MAX_REASON: usize = 200;

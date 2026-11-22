@@ -5,9 +5,12 @@
 use std::sync::Arc;
 
 use strawberry_plugin_api::{
-    Player, Server,
+    OfflinePlayer, Player, Server,
     common::{GameMode, NamedColor},
-    player::{BanPlayerOptions, BedrockDisconnectReason, BedrockKickOptions, JavaKickOptions},
+    player::{
+        BanIpOptions, BanPlayerOptions, BedrockDisconnectReason, BedrockKickOptions,
+        JavaKickOptions,
+    },
     scheduler::SchedulerExt,
     text::TextComponent,
     uuid::Uuid,
@@ -19,7 +22,9 @@ use crate::{
     cmdline::Observed,
     duration,
     history::{Entry, Kind, Record},
+    ipban,
     lang::{self, Msg},
+    perms,
     staffstate::{Frozen, Mode, Watch},
     text, vanish,
 };
@@ -54,8 +59,8 @@ pub fn online(server: &Server, name: &str) -> Result<Player, Line> {
     server.get_player_by_name(name).ok_or_else(missing)
 }
 
-/// The player called `name`, online or seen before.
-pub fn known(admin: &Admin, server: &Server, name: &str) -> Result<Target, Line> {
+/// The player called `name`, online or in the server's record of who joined before.
+pub fn known(server: &Server, name: &str) -> Result<Target, Line> {
     let unknown = || Line::from(Msg::new("unknown_player").plain(shown(name)));
     if !text::valid_name(name) {
         return Err(unknown());
@@ -67,14 +72,20 @@ pub fn known(admin: &Admin, server: &Server, name: &str) -> Result<Target, Line>
             player: Some(player),
         });
     }
-    let found = lock(&admin.seen).lookup(name);
-    found
-        .map(|(id, name)| Target {
-            id,
-            name,
-            player: None,
-        })
+    server
+        .get_offline_player_by_name(name)
+        .map(offline_target)
         .ok_or_else(unknown)
+}
+
+/// A player who is not online, from the server's record of him (his id as the plugin writes it,
+/// the name he last joined with).
+fn offline_target(record: OfflinePlayer) -> Target {
+    Target {
+        id: record.id.to_string(),
+        name: record.name,
+        player: None,
+    }
 }
 
 /// The player with this UUID if he is online.
@@ -637,7 +648,7 @@ pub fn kick(
     Ok(())
 }
 
-/// `/tempban`: the server's own ban list, with an end. Vanilla `/ban` stays vanilla.
+/// `/tempban`: the engine's own ban list, with an end. Vanilla `/ban` stays vanilla.
 pub fn tempban(
     admin: &Arc<Admin>,
     server: &Server,
@@ -684,7 +695,7 @@ pub fn tempban(
     Ok(())
 }
 
-/// The server's ban of the player last called `name` (any case): his UUID and name.
+/// The engine's ban of the player last called `name` (any case): his UUID and name.
 #[must_use]
 pub fn ban_by_name(server: &Server, name: &str) -> Option<(Uuid, String)> {
     server
@@ -695,7 +706,7 @@ pub fn ban_by_name(server: &Server, name: &str) -> Option<(Uuid, String)> {
         .map(|entry| (entry.uuid, entry.name))
 }
 
-/// `/unban`: lifts a ban of the server's list (a vanilla `/ban` or a `/tempban`), with vanilla's
+/// `/unban`: lifts a ban of the engine's list (a vanilla `/ban` or a `/tempban`), with vanilla's
 /// `/pardon` messages.
 pub fn unban(admin: &Arc<Admin>, server: &Server, actor: &Actor, name: &str) -> Outcome {
     let failed = || Line::vanilla("commands.pardon.failed", Vec::new());
@@ -727,6 +738,88 @@ pub fn unban(admin: &Arc<Admin>, server: &Server, actor: &Actor, name: &str) -> 
     Ok(())
 }
 
+/// `/tempipban`: the server bans the player's address for a time and kicks everyone online on
+/// it. The server's `/ban-ip <player>` stays the permanent one, and `/pardon-ip <player>` lifts
+/// both. The address is never seen here: the server bans it by the player's UUID and answers with
+/// the ban's id or why nothing was banned ([`ipban`]). Because the server decides, the ban comes
+/// first and the record follows only a ban that was made: a crash between the two can lose the
+/// history line, never write a ban that did not happen.
+pub fn tempipban(
+    admin: &Arc<Admin>,
+    server: &Server,
+    actor: &Actor,
+    target: &Target,
+    seconds: u64,
+    reason: &str,
+) -> Outcome {
+    guard(admin, server, actor, &target.id, &target.name)?;
+    let Some(uuid) = admin::uuid_from(&target.id) else {
+        return Err(Msg::new("unknown_player").plain(&target.name).into());
+    };
+    // Staff online on the target's address would ban themselves. The keys compare addresses
+    // without showing them; an offline target's last address is known to the server only.
+    if let (Some(staff), Some(player)) = (&actor.player, &target.player)
+        && staff.address_key() == player.address_key()
+    {
+        return Err(Msg::new("ipban_own").plain(&target.name).into());
+    }
+    let reason = text::clean_reason(reason);
+    let options = BanIpOptions {
+        reason: (!reason.is_empty()).then(|| TextComponent::text(&reason)),
+        source: Some(actor.name.clone()),
+        expires_at_utc: None,
+        duration_seconds: Some(seconds),
+        kick_matching_players: true,
+        log_to_console: true,
+    };
+    admin.expect_kick(&target.name, None);
+    let ban_id = match server
+        .get_ban_manager()
+        .ban_ip_of(uuid, options, Some(perms::EXEMPT))
+    {
+        Ok(id) => id,
+        Err(why) => {
+            admin.take_expected_kick(&target.name);
+            return Err(ipban::refusal(&why, &target.name).into());
+        }
+    };
+    let record = admin.record(
+        server,
+        actor,
+        admin::entry(
+            Kind::TempIpBan,
+            actor,
+            &target.id,
+            &target.name,
+            Some(seconds),
+            &reason,
+        ),
+    );
+    let done = Line::from(with_reason(
+        Msg::new("ipban_done")
+            .plain(&target.name)
+            .duration(seconds)
+            .plain(text::clean_reason(&ban_id)),
+        &record.reason,
+    ));
+    actor.tell(&done);
+    notify(server, actor, &done);
+    Ok(())
+}
+
+/// The ids of the IP bans in force that name the player `uuid` (the players seen on the address
+/// when it was banned).
+fn ip_bans_naming(server: &Server, uuid: Uuid) -> Vec<String> {
+    let id = uuid.to_string();
+    server
+        .get_ban_manager()
+        .ip_bans()
+        .into_iter()
+        .filter(|ban| ban.players.iter().any(|player| player.to_string() == id))
+        .map(|ban| ban.id)
+        .collect()
+}
+
 pub const HISTORY_PER_PAGE: usize = 8;
 
 fn history_line(record: &Record) -> Msg {
@@ -747,7 +840,7 @@ fn history_line(record: &Record) -> Msg {
 
 /// `/history <player> [page]`: the player's records, newest first.
 pub fn history(admin: &Admin, server: &Server, actor: &Actor, name: &str, page: usize) -> Outcome {
-    let (id, target_name) = match known(admin, server, name) {
+    let (id, target_name) = match known(server, name) {
         Ok(target) => (target.id, target.name),
         Err(unknown) => match ban_by_name(server, name).filter(|_| text::valid_name(name)) {
             Some((uuid, banned_name)) => (uuid.to_string(), banned_name),
@@ -839,7 +932,49 @@ pub fn observe_vanilla(admin: &Arc<Admin>, server: &Server, staff: Who, observed
                 }
             });
         }
+        // The server's own IP ban of a player: written when a ban naming him is in force a
+        // second later that was not before (a refused ban writes nothing). Its kick is not a
+        // punishment of its own: the player is not on the player ban list.
+        Observed::IpBan { target, reason } => {
+            let Some((uuid, name)) = known_uuid(server, &target) else {
+                return;
+            };
+            let before = ip_bans_naming(server, uuid);
+            server.schedule_delayed_task(20, move |server| {
+                if ip_bans_naming(&server, uuid)
+                    .iter()
+                    .any(|id| !before.contains(id))
+                {
+                    let entry =
+                        vanilla_entry(Kind::IpBan, &staff, &uuid.to_string(), &name, &reason);
+                    admin.record_vanilla(&server, &staff, entry);
+                }
+            });
+        }
+        // `/pardon-ip <player>`: written when a ban that named him is gone a second later.
+        Observed::IpPardon { target } => {
+            let Some((uuid, name)) = known_uuid(server, &target) else {
+                return;
+            };
+            let before = ip_bans_naming(server, uuid);
+            if before.is_empty() {
+                return;
+            }
+            server.schedule_delayed_task(20, move |server| {
+                let after = ip_bans_naming(&server, uuid);
+                if before.iter().any(|id| !after.contains(id)) {
+                    let entry = vanilla_entry(Kind::IpUnban, &staff, &uuid.to_string(), &name, "");
+                    admin.record_vanilla(&server, &staff, entry);
+                }
+            });
+        }
     }
+}
+
+/// The UUID and name of the player called `name`, online or seen before.
+fn known_uuid(server: &Server, name: &str) -> Option<(Uuid, String)> {
+    let target = known(server, name).ok()?;
+    admin::uuid_from(&target.id).map(|uuid| (uuid, target.name))
 }
 
 fn vanilla_entry(kind: Kind, staff: &Who, id: &str, name: &str, reason: &str) -> Entry {
@@ -856,7 +991,7 @@ fn vanilla_entry(kind: Kind, staff: &Who, id: &str, name: &str, reason: &str) ->
 }
 
 /// A player was kicked. One of admin-lite's own kicks is already in the history; a vanilla `/kick`
-/// or `/ban` seen in a command line is written now. Otherwise, if he is now on the server's ban
+/// or `/ban` seen in a command line is written now. Otherwise, if he is now on the engine's ban
 /// list and was not before (a ban by another plugin or a path the plugin did not see), it is
 /// written with the ban list's own source and reason. Other kicks are not punishments (a time-out,
 /// a login plugin's wrong password) and are not written.
@@ -896,9 +1031,9 @@ pub fn kicked(admin: &Arc<Admin>, server: &Server, player: &Player) {
         if !lock(&admin.known_bans).insert(id.clone()) {
             return;
         }
-        let staff_id = lock(&admin.seen)
-            .lookup(&ban.source)
-            .map_or_else(|| "unknown".to_owned(), |(id, _)| id);
+        let staff_id = server
+            .get_offline_player_by_name(&ban.source)
+            .map_or_else(|| "unknown".to_owned(), |record| record.id.to_string());
         let staff = Who {
             name: ban.source.clone(),
             id: staff_id,
@@ -916,7 +1051,7 @@ pub fn kicked(admin: &Arc<Admin>, server: &Server, player: &Player) {
     });
 }
 
-/// After a load: the bans already on the server's list are not new.
+/// After a load: the bans already on the engine's list are not new.
 pub fn read_known_bans(admin: &Admin, server: &Server) {
     let bans: std::collections::HashSet<String> = server
         .get_ban_manager()
@@ -925,4 +1060,36 @@ pub fn read_known_bans(admin: &Admin, server: &Server) {
         .map(|ban| ban.uuid.to_string())
         .collect();
     *lock(&admin.known_bans) = bans;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn record(high: u64, low: u64, name: &str) -> OfflinePlayer {
+        OfflinePlayer {
+            id: Uuid { high, low },
+            name: name.to_owned(),
+            first_joined: Some(1),
+            last_seen: 2,
+        }
+    }
+
+    #[test]
+    fn an_offline_player_is_a_target_with_his_last_name_and_no_online_handle() {
+        let target = offline_target(record(0x1234, 0x5678, "Alex"));
+        assert_eq!(target.name, "Alex");
+        assert!(target.player.is_none());
+    }
+
+    #[test]
+    fn an_offline_targets_id_reads_back_as_the_same_uuid() {
+        let target = offline_target(record(0x0123_4567_89ab_cdef, 0xfedc_ba98_7654_3210, "Alex"));
+        let back =
+            admin::uuid_from(&target.id).expect("the id is a UUID in the plugin's text form");
+        assert_eq!(
+            (back.high, back.low),
+            (0x0123_4567_89ab_cdef, 0xfedc_ba98_7654_3210)
+        );
+    }
 }

@@ -1,4 +1,4 @@
-//! Vanish: real hiding, through the server's `hide-player`. A vanished staff member is gone for
+//! Vanish: real hiding, through the engine's `hide-player`. A vanished staff member is gone for
 //! everyone who may not see vanished staff: no body, no armour, no held item, no tab-list entry,
 //! not in `/list` or in command suggestions. No potion effect is involved.
 //!

@@ -1,8 +1,8 @@
 //! The punishment history: every warning, mute, unmute, kick, ban, temporary ban and unban,
 //! kept in `history.tsv` in the plugin's data folder, one record per line.
 //!
-//! The file is the plugin's own record; the server's ban list stays the authority on who is
-//! banned. Mutes have no server counterpart, so the active mutes are derived from this history
+//! The file is the plugin's own record; the engine's ban list stays the authority on who is
+//! banned. Mutes have no engine counterpart, so the active mutes are derived from this history
 //! (the newest mute or unmute of a player decides) and kept in an index for the chat check.
 //!
 //! Line format (tab-separated, fields escaped with [`text::escape`]):
@@ -29,10 +29,15 @@ pub enum Kind {
     Ban,
     TempBan,
     Unban,
+    /// A ban of the player's address, made by the server: the record names the player, never
+    /// the address.
+    IpBan,
+    TempIpBan,
+    IpUnban,
 }
 
 impl Kind {
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 10] = [
         Self::Warn,
         Self::Mute,
         Self::Unmute,
@@ -40,6 +45,9 @@ impl Kind {
         Self::Ban,
         Self::TempBan,
         Self::Unban,
+        Self::IpBan,
+        Self::TempIpBan,
+        Self::IpUnban,
     ];
 
     /// The word in the file and in the audit log.
@@ -53,6 +61,9 @@ impl Kind {
             Self::Ban => "ban",
             Self::TempBan => "tempban",
             Self::Unban => "unban",
+            Self::IpBan => "ipban",
+            Self::TempIpBan => "tempipban",
+            Self::IpUnban => "unipban",
         }
     }
 
@@ -67,6 +78,9 @@ impl Kind {
             Self::Ban => "kind_ban",
             Self::TempBan => "kind_tempban",
             Self::Unban => "kind_unban",
+            Self::IpBan => "kind_ipban",
+            Self::TempIpBan => "kind_tempipban",
+            Self::IpUnban => "kind_unipban",
         }
     }
 

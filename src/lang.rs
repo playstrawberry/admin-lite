@@ -160,6 +160,7 @@ mod tests {
             include_str!("duration.rs"),
             include_str!("vanish.rs"),
             include_str!("announce.rs"),
+            include_str!("ipban.rs"),
         ];
         let english = keys(FILES[0].1);
         let mut used = 0;

@@ -1,7 +1,8 @@
-//! Public punishment announcements: on by default; a server turns them off by taking the node
-//! `admin-lite:announcements` from everyone.
+//! Public punishment announcements (owner, 2026-11-02, AL-1: "cezaların herkese görünüp
+//! görünmemesi ayarlarda seçilir ... otomatik açık gelir ayarlarında kapatılabilir").
 //!
-//! Every online player reads one line when a player is warned, muted, kicked or banned:
+//! Every online player reads one line when a player is warned, muted, kicked, banned or IP
+//! banned:
 //! the punished name, the kind, the length and the reason. **Never the staff member's name**
 //! (it is not an input of [`message`]) and never an IP address: the name and the reason pass
 //! [`text::clean_reason`], which shows any address as `[IP]`. Lifting a punishment (unmute,
@@ -26,7 +27,9 @@ pub fn message(record: &Record) -> Option<Msg> {
         Kind::Kick => "announce_kick",
         Kind::Ban => "announce_ban",
         Kind::TempBan => "announce_tempban",
-        Kind::Unmute | Kind::Unban => return None,
+        Kind::IpBan => "announce_ipban",
+        Kind::TempIpBan => "announce_tempipban",
+        Kind::Unmute | Kind::Unban | Kind::IpUnban => return None,
     };
     let name: String = text::clean_reason(&record.target_name)
         .chars()
@@ -34,8 +37,8 @@ pub fn message(record: &Record) -> Option<Msg> {
         .collect();
     let msg = Msg::new(key).plain(name);
     let msg = match (record.kind, record.duration) {
-        (Kind::Mute | Kind::TempBan, Some(seconds)) => msg.duration(seconds),
-        (Kind::Mute | Kind::TempBan, None) => msg.plain("-"),
+        (Kind::Mute | Kind::TempBan | Kind::TempIpBan, Some(seconds)) => msg.duration(seconds),
+        (Kind::Mute | Kind::TempBan | Kind::TempIpBan, None) => msg.plain("-"),
         _ => msg,
     };
     let reason = text::clean_reason(&record.reason);
@@ -93,6 +96,14 @@ mod tests {
             text(Kind::TempBan, Some(86_400), "x-ray").as_deref(),
             Some("Alex was banned for 1d. Reason: x-ray")
         );
+        assert_eq!(
+            text(Kind::IpBan, None, "alts").as_deref(),
+            Some("Alex was IP banned. Reason: alts")
+        );
+        assert_eq!(
+            text(Kind::TempIpBan, Some(604_800), "alts").as_deref(),
+            Some("Alex was IP banned for 1w. Reason: alts")
+        );
         let tr = message(&record(Kind::Mute, Some(5_400), "spam")).map(|m| m.render("tr"));
         assert_eq!(
             tr.as_deref(),
@@ -104,6 +115,7 @@ mod tests {
     fn lifting_a_punishment_is_not_announced() {
         assert_eq!(message(&record(Kind::Unmute, None, "")), None);
         assert_eq!(message(&record(Kind::Unban, None, "")), None);
+        assert_eq!(message(&record(Kind::IpUnban, None, "")), None);
     }
 
     #[test]
@@ -128,7 +140,7 @@ mod tests {
                 assert!(text.contains("[IP]"), "{code} {kind:?}: {text}");
             }
         }
-        assert_eq!(announced, 5);
+        assert_eq!(announced, 7);
         let mut odd = record(Kind::Kick, None, "");
         odd.target_name = "10.0.0.8".into();
         let text = message(&odd).map(|m| m.render("en")).unwrap_or_default();

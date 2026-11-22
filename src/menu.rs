@@ -291,6 +291,6 @@ mod tests {
         assert_eq!(inv_slot(43), Some(InvSlot::Refresh));
         assert_eq!(inv_slot(44), Some(InvSlot::Back));
         assert_eq!(inv_slot(45), None);
-        assert!(ENDER_REFRESH_SLOT >= 27 && ENDER_BACK_SLOT < ENDER_VIEW_SIZE);
+        const { assert!(ENDER_REFRESH_SLOT >= 27 && ENDER_BACK_SLOT < ENDER_VIEW_SIZE) };
     }
 }

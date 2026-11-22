@@ -33,15 +33,16 @@ pub const MUTE: &str = "admin-lite:mute";
 pub const KICK: &str = "admin-lite:kick";
 pub const TEMPBAN: &str = "admin-lite:tempban";
 pub const UNBAN: &str = "admin-lite:unban";
+pub const TEMPIPBAN: &str = "admin-lite:tempipban";
 pub const HISTORY: &str = "admin-lite:history";
 pub const NOTIFY: &str = "admin-lite:notify";
 pub const EXEMPT: &str = "admin-lite:exempt";
-/// Who reads public punishment announcements: everyone by default.
+/// Who reads public punishment announcements: everyone by default (owner, 2026-11-02, AL-1).
 /// Taking it from everyone turns the announcements off until the plugin settings format exists.
 pub const ANNOUNCEMENTS: &str = "admin-lite:announcements";
 
 /// `(node, description for the server owner, default)`.
-pub const ALL: [(&str, &str, Default); 26] = [
+pub const ALL: [(&str, &str, Default); 27] = [
     (MENU, "Open the staff menu with /staff", Default::Op(2)),
     (
         INVSEE,
@@ -93,6 +94,11 @@ pub const ALL: [(&str, &str, Default); 26] = [
     ),
     (UNBAN, "Unban players with /unban", Default::Op(3)),
     (
+        TEMPIPBAN,
+        "Ban a player's address for a time with /tempipban",
+        Default::Op(3),
+    ),
+    (
         HISTORY,
         "Read punishment history with /history",
         Default::Op(2),
@@ -128,7 +134,7 @@ mod tests {
 
     #[test]
     fn kick_and_bans_need_vanillas_level_three() {
-        for node in [KICK, TEMPBAN, UNBAN] {
+        for node in [KICK, TEMPBAN, UNBAN, TEMPIPBAN] {
             let (_, _, default) = ALL.iter().find(|(n, _, _)| *n == node).copied().unwrap();
             assert_eq!(default, Default::Op(3), "{node}");
         }
